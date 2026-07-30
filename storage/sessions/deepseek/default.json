@@ -1,0 +1,10 @@
+{
+  "type": "cookie",
+  "cookies": [
+    {
+      "name": "VPS_PE_DAALNA",
+      "value": "VPS_PE_DAALNA"
+    }
+  ],
+  "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+}
