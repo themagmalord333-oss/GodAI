@@ -2,78 +2,53 @@ import aiohttp
 import asyncio
 import json
 import time
-import uuid
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from ai.providers.base import BaseProvider
-from utils.logger import logger
 
-class ChatGPTWebClient(BaseProvider):
+class DeepSeekWebClient(BaseProvider):
     def __init__(self, session_path: str):
         super().__init__(session_path)
-        self.provider_name = "chatgpt"
-        self.api_url = "https://chatgpt.com/backend-api/conversation"
-        self.access_token = None
+        self.provider_name = "deepseek"
+        self.api_url = "https://chat.deepseek.com/api/v0/chat/completions"
+        self.cookies = {}
+        self.user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         
-        asyncio.create_task(self.load_session())
-
     async def load_session(self) -> bool:
         try:
             with open(self.session_path, 'r') as f:
                 data = json.load(f)
-            self.access_token = data.get("access_token")
-            self.auth_type = "api_token"
-            self.is_connected = bool(self.access_token)
+            self.cookies = {c["name"]: c["value"] for c in data.get("cookies", [])}
+            self.user_agent = data.get("user_agent", self.user_agent)
+            self.is_connected = bool(self.cookies)
             return self.is_connected
         except Exception:
             self.is_connected = False
             return False
 
-    async def health_check(self) -> Dict[str, Any]:
-        return {"status": "Valid" if self.is_connected else "Invalid", "auth_type": self.auth_type}
-
-    async def generate(self, prompt: str, conversation_id: Optional[str] = None, parent_id: Optional[str] = None) -> Dict[str, Any]:
+    async def generate(self, prompt: str) -> Dict[str, Any]:
+        await self.load_session()
         if not self.is_connected:
-            raise PermissionError("ChatGPT Token Missing.")
+            raise PermissionError("DeepSeek Cookie missing or invalid in storage/sessions/deepseek/default.json")
 
-        model = self.settings.get("target_model", "gpt-4o")
         headers = {
-            "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json",
-            "Accept": "text/event-stream"
+            "User-Agent": self.user_agent,
+            "Origin": "https://chat.deepseek.com",
+            "Referer": "https://chat.deepseek.com/"
         }
         
-        msg_id = str(uuid.uuid4())
         payload = {
-            "action": "next",
-            "messages": [{"id": msg_id, "author": {"role": "user"}, "content": {"content_type": "text", "parts": [prompt]}}],
-            "model": model,
-            "parent_message_id": parent_id or str(uuid.uuid4()),
+            "message_id": "auto",
+            "prompt": prompt,
+            "model": self.settings.get("target_model", "deepseek-coder"),
+            "options": {"web_search": self.settings.get("search", False)}
         }
-        if conversation_id: payload["conversation_id"] = conversation_id
 
-        async with aiohttp.ClientSession(headers=headers) as session:
+        async with aiohttp.ClientSession(cookies=self.cookies, headers=headers) as session:
             async with session.post(self.api_url, json=payload) as response:
                 response.raise_for_status()
-                stream_data = await response.text()
-                
-                # SSE Parser
-                full_text, new_conv_id, new_msg_id = "", conversation_id, ""
-                for line in stream_data.splitlines():
-                    if line.startswith("data: ") and line != "data: [DONE]":
-                        try:
-                            data = json.loads(line[6:])
-                            if "message" in data and data["message"]["author"]["role"] == "assistant":
-                                full_text = data["message"]["content"].get("parts", [""])[0]
-                                new_msg_id = data["message"]["id"]
-                                new_conv_id = data.get("conversation_id", new_conv_id)
-                        except json.JSONDecodeError:
-                            pass
-
+                data = await response.json()
                 return {
-                    "text": full_text,
-                    "conversation_id": new_conv_id,
-                    "parent_id": new_msg_id,
-                    "provider": "chatgpt",
-                    "usage": {"input": 0, "output": 0},
-                    "timestamp": time.time()
+                    "text": data.get("text", data.get("content", "")),
+                    "provider": "deepseek"
                 }
