@@ -1,0 +1,26 @@
+{
+  "chatgpt": {
+    "instant": "gpt-4o-mini",
+    "expert": "gpt-4o",
+    "reasoning": "o1-preview",
+    "vision": "gpt-4o"
+  },
+  "gemini": {
+    "instant": "gemini-1.5-flash",
+    "expert": "gemini-1.5-pro",
+    "reasoning": "gemini-1.5-pro",
+    "vision": "gemini-1.5-flash"
+  },
+  "deepseek": {
+    "instant": "deepseek-chat",
+    "expert": "deepseek-coder",
+    "reasoning": "deepseek-reasoner",
+    "vision": null
+  },
+  "claude": {
+    "instant": "claude-3-haiku",
+    "expert": "claude-3-5-sonnet",
+    "reasoning": "claude-3-5-sonnet",
+    "vision": "claude-3-5-sonnet"
+  }
+}
